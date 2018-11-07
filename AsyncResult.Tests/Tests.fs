@@ -1,0 +1,244 @@
+module Tests
+
+open System.Threading.Tasks
+open System.Data.SQLite
+
+open Xunit
+
+open AsyncResult
+open AsyncResult
+open System.Data.SQLite
+
+[<Fact>]
+let ``return async result`` () =
+    let res = asyncResult {
+        return 1
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
+
+[<Fact>]
+let ``return from async result`` () =
+    let res = asyncResult {
+        return! async { return Ok 1 }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
+
+[<Fact>]
+let ``bind async result`` () =
+    let res = asyncResult {
+        let! v = async { return Ok 1 }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
+
+[<Fact>]
+let ``bind async result with error`` () =
+    let res = asyncResult {
+        let! v = async { return Error "foobar" }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Error "foobar", res)
+
+[<Fact>]
+let ``do async result`` () =
+    let res = asyncResult {
+        let mutable v = 1
+        do! async {
+            v <- 2
+            return Ok ()
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 2, res)
+
+[<Fact>]
+let ``do async result with error`` () =
+    let res = asyncResult {
+        let mutable v = 1
+        do! async {
+            v <- 2
+            return Error "foobar"
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Error "foobar", res)
+
+[<Fact>]
+let ``do async with task result`` () =
+    let res = asyncResult {
+        let! v = Task.FromResult(Ok 1) |> Async.AwaitTask
+        let mutable v = v
+        do! async {
+            v <- v + 1
+            return Ok ()
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 2, res)
+
+[<Fact>]
+let ``do async with task result with error`` () =
+    let res = asyncResult {
+        let! v = Task.FromResult(Error "foobar") |> Async.AwaitTask
+        let mutable v = v
+        do! async {
+            v <- v + 1
+            return Ok ()
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Error "foobar", res)
+
+[<Fact>]
+let ``do async with task result directly`` () =
+    let res = asyncResult {
+        let! v = Task.FromResult(Ok 1)
+        let mutable v = v
+        do! async {
+            v <- v + 1
+            return Ok ()
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 2, res)
+
+[<Fact>]
+let ``do async with task result with error directly`` () =
+    let res = asyncResult {
+        let! v = Task.FromResult(Error "foobar")
+        let mutable v = v
+        do! async {
+            v <- v + 1
+            return Ok ()
+        }
+        return! async { return Ok v }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Error "foobar", res)
+
+[<Fact>]
+let ``try with async with task result directly`` () =
+
+    let res = asyncResult {
+        try
+            let mutable v = 1
+            do! async {
+                v <- v + 1
+                return Ok ()
+            }
+            failwithf "%i" v
+            return ()
+        with
+            | Failure e -> return! async { return Error e }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Error "2", res)
+
+[<Fact>]
+let ``try finally async with task result directly`` () =
+
+    let mutable finallyCheck = false
+
+    let res = asyncResult {
+        try
+            try
+                let mutable v = 1
+                do! async {
+                    v <- v + 1
+                    return Ok ()
+                }
+                failwithf "%i" v
+                return ()
+            with
+                | Failure e -> return! async { return Error e }
+        finally
+            finallyCheck <- true
+            ()
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.True(finallyCheck)
+    Assert.Equal(Error "2", res)
+
+[<Fact>]
+let ``asyncResult with Sqlite`` () =
+    let connectionStringMemory = sprintf "Data Source=:memory:;Version=3;New=True;" 
+    let connection = new SQLiteConnection(connectionStringMemory)
+
+    let res: Async<Result<int, _>> = asyncResult {
+        do! connection.OpenAsync().ContinueWith(fun _ -> Ok ())
+        return 1
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
+
+let mapTask mapper (task: Task<'TIn>) : Task<'TOut> =
+    task.ContinueWith(fun (t: Task<'TIn>) -> mapper t.Result)
+
+[<Fact>]
+let ``asyncResult with Sqlite including insert data`` () =
+    let connectionStringMemory = sprintf "Data Source=:memory:;Version=3;New=True;" 
+    let connection = new SQLiteConnection(connectionStringMemory)
+
+    let res: Async<Result<float, _>> = asyncResult {
+        do! connection.OpenAsync().ContinueWith(fun _ -> Ok ())
+
+        let create = "
+            CREATE TABLE table1 (
+                column1 float);"
+
+        let cmd = new SQLiteCommand(create, connection)
+        do! cmd.ExecuteNonQueryAsync() |> mapTask (fun _ -> Ok ())
+
+        let insert = "INSERT INTO table1 (column1) VALUES (12.1);"
+        let insertCmd= new SQLiteCommand(insert, connection)
+        do! insertCmd.ExecuteNonQueryAsync() |> mapTask (fun _ -> Ok ())
+
+        let select = "SELECT * FROM table1;"
+        let insertCmd= new SQLiteCommand(select, connection)
+        let! reader = insertCmd.ExecuteReaderAsync() |> mapTask (fun r -> Ok r)
+        do! reader.ReadAsync() |> mapTask (fun _ -> Ok ())
+        let value = System.Convert.ToDouble(reader.["column1"])
+
+        return value
+    }
+
+    let res = Async.RunSynchronously res
+
+    let res = match res with | Ok v -> v | Error e -> failwithf "%A" e
+
+    Assert.Equal(12.1, res, 2)
