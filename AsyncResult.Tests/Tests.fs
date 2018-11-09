@@ -206,8 +206,19 @@ let ``asyncResult with Sqlite`` () =
 
     Assert.Equal(Ok 1, res)
 
-let mapTask mapper (task: Task<'TIn>) : Task<'TOut> =
-    task.ContinueWith(fun (t: Task<'TIn>) -> mapper t.Result)
+[<Fact>]
+let ``asyncResult with Task x`` () =
+
+    let res: Async<Result<int, _>> = asyncResult {
+        let! i = Task.FromResult(1)
+        let! f = Task.FromResult(1.0)
+        let! (f2 : float) = Task.FromResult(Ok 2.0)
+        return 1
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
 
 [<Fact>]
 let ``asyncResult with Sqlite including insert data`` () =
@@ -222,16 +233,16 @@ let ``asyncResult with Sqlite including insert data`` () =
                 column1 float);"
 
         let cmd = new SQLiteCommand(create, connection)
-        do! cmd.ExecuteNonQueryAsync() |> mapTask (fun _ -> Ok ())
+        let! _ = cmd.ExecuteNonQueryAsync()
 
         let insert = "INSERT INTO table1 (column1) VALUES (12.1);"
         let insertCmd= new SQLiteCommand(insert, connection)
-        do! insertCmd.ExecuteNonQueryAsync() |> mapTask (fun _ -> Ok ())
+        let! rowAffected = insertCmd.ExecuteNonQueryAsync()
 
         let select = "SELECT * FROM table1;"
         let insertCmd= new SQLiteCommand(select, connection)
-        let! reader = insertCmd.ExecuteReaderAsync() |> mapTask (fun r -> Ok r)
-        do! reader.ReadAsync() |> mapTask (fun _ -> Ok ())
+        let! reader = insertCmd.ExecuteReaderAsync()
+        let! _ = reader.ReadAsync()
         let value = System.Convert.ToDouble(reader.["column1"])
 
         return value
