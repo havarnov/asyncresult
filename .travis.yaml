@@ -1,0 +1,6 @@
+language: csharp
+mono: none
+dotnet: 2.1.*
+script:
+ - dotnet build AsyncResult/AsyncResult.csproj
+ - dotnet test AsyncResult.Tests/AsyncResult.Test.csproj
