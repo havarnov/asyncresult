@@ -117,7 +117,7 @@ let ``do async with task result with error`` () =
 [<Fact>]
 let ``do async with task result directly`` () =
     let res = asyncResult {
-        let! v = Task.FromResult(Ok 1)
+        let! v = Task.FromResult(1)
         let mutable v = v
         do! async {
             v <- v + 1
@@ -129,22 +129,6 @@ let ``do async with task result directly`` () =
     let res = Async.RunSynchronously res
 
     Assert.Equal(Ok 2, res)
-
-[<Fact>]
-let ``do async with task result with error directly`` () =
-    let res = asyncResult {
-        let! v = Task.FromResult(Error "foobar")
-        let mutable v = v
-        do! async {
-            v <- v + 1
-            return Ok ()
-        }
-        return! async { return Ok v }
-    }
-
-    let res = Async.RunSynchronously res
-
-    Assert.Equal(Error "foobar", res)
 
 [<Fact>]
 let ``try with async with task result directly`` () =
@@ -213,7 +197,6 @@ let ``asyncResult with Task x`` () =
     let res: Async<Result<int, _>> = asyncResult {
         let! i = Task.FromResult(1)
         let! f = Task.FromResult(1.0)
-        let! (f2 : float) = Task.FromResult(Ok 2.0)
         do! Task.CompletedTask
         return 1
     }
