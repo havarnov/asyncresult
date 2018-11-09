@@ -8,6 +8,7 @@ open Xunit
 open AsyncResult
 open AsyncResult
 open System.Data.SQLite
+open System.Data.Common
 
 [<Fact>]
 let ``return async result`` () =
@@ -213,6 +214,7 @@ let ``asyncResult with Task x`` () =
         let! i = Task.FromResult(1)
         let! f = Task.FromResult(1.0)
         let! (f2 : float) = Task.FromResult(Ok 2.0)
+        do! Task.CompletedTask
         return 1
     }
 
@@ -226,7 +228,7 @@ let ``asyncResult with Sqlite including insert data`` () =
     let connection = new SQLiteConnection(connectionStringMemory)
 
     let res: Async<Result<float, _>> = asyncResult {
-        do! connection.OpenAsync().ContinueWith(fun _ -> Ok ())
+        do! connection.OpenAsync()
 
         let create = "
             CREATE TABLE table1 (
@@ -241,7 +243,7 @@ let ``asyncResult with Sqlite including insert data`` () =
 
         let select = "SELECT * FROM table1;"
         let insertCmd= new SQLiteCommand(select, connection)
-        let! reader = insertCmd.ExecuteReaderAsync()
+        let! (reader: DbDataReader) = insertCmd.ExecuteReaderAsync()
         let! _ = reader.ReadAsync()
         let value = System.Convert.ToDouble(reader.["column1"])
 

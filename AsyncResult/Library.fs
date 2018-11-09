@@ -20,6 +20,12 @@ type AsyncResultBuilder() =
             | Error err -> return Error err
         }
 
+    member __.Bind(task: Task, binder: unit -> Async<Result<'TOk, 'TError>>) =
+        async {
+            do! task |> Async.AwaitTask
+            return! binder ()
+        }
+
     member __.Bind(task: Task<'T>, binder: 'T -> Async<Result<'TOk, 'TError>>) : Async<Result<'TOk, 'TError>> =
         async {
             let! res = task |> Async.AwaitTask
