@@ -1,14 +1,12 @@
 module Tests
 
 open System.Threading.Tasks
+open System.Data.Common
 open System.Data.SQLite
 
 open Xunit
 
 open AsyncResult
-open AsyncResult
-open System.Data.SQLite
-open System.Data.Common
 
 [<Fact>]
 let ``return async result`` () =
@@ -208,10 +206,10 @@ let ``asyncResult with Task x`` () =
 [<Fact>]
 let ``asyncResult with Sqlite including insert data`` () =
     let connectionStringMemory = sprintf "Data Source=:memory:;Version=3;New=True;" 
-    let connection = new SQLiteConnection(connectionStringMemory)
 
     let res: Async<Result<float, _>> = asyncResult {
         try
+            use connection = new SQLiteConnection(connectionStringMemory)
             do! connection.OpenAsync()
 
             let create = "

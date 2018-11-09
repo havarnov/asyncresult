@@ -2,6 +2,7 @@
 module AsyncResult
 
 open System.Threading.Tasks
+open System
 
 type AsyncResultBuilder() =
     member __.Return(value) = async { return Ok value }
@@ -31,6 +32,9 @@ type AsyncResultBuilder() =
             let! res = task |> Async.AwaitTask
             return! binder res
         }
+
+    member __.Using(res:#IDisposable, body) =
+        __.TryFinally(body res, fun () -> match res with null -> () | disp -> disp.Dispose())
 
     member __.Delay(f: unit -> Async<Result<_, _>>) = f()
 
