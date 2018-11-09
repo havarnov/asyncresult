@@ -228,26 +228,30 @@ let ``asyncResult with Sqlite including insert data`` () =
     let connection = new SQLiteConnection(connectionStringMemory)
 
     let res: Async<Result<float, _>> = asyncResult {
-        do! connection.OpenAsync()
+        try
+            do! connection.OpenAsync()
 
-        let create = "
-            CREATE TABLE table1 (
-                column1 float);"
+            let create = "
+                CREATE TABLE table1 (
+                    column1 float);"
 
-        let cmd = new SQLiteCommand(create, connection)
-        let! _ = cmd.ExecuteNonQueryAsync()
+            let cmd = new SQLiteCommand(create, connection)
+            let! _ = cmd.ExecuteNonQueryAsync()
 
-        let insert = "INSERT INTO table1 (column1) VALUES (12.1);"
-        let insertCmd= new SQLiteCommand(insert, connection)
-        let! rowAffected = insertCmd.ExecuteNonQueryAsync()
+            let insert = "INSERT INTO table1 (column1) VALUES (12.1);"
+            let insertCmd= new SQLiteCommand(insert, connection)
+            let! rowAffected = insertCmd.ExecuteNonQueryAsync()
 
-        let select = "SELECT * FROM table1;"
-        let insertCmd= new SQLiteCommand(select, connection)
-        let! (reader: DbDataReader) = insertCmd.ExecuteReaderAsync()
-        let! _ = reader.ReadAsync()
-        let value = System.Convert.ToDouble(reader.["column1"])
+            let select = "SELECT * FROM table1;"
+            let insertCmd= new SQLiteCommand(select, connection)
+            let! (reader: DbDataReader) = insertCmd.ExecuteReaderAsync()
+            let! _ = reader.ReadAsync()
+            let value = System.Convert.ToDouble(reader.["column1"])
 
-        return value
+            return value
+        with
+            | :? System.Data.SQLite.SQLiteException as ex ->
+                return! async { return Error ex }
     }
 
     let res = Async.RunSynchronously res
