@@ -3,4 +3,4 @@
 
 # AsyncResult
 
-A computional expression for `Async<Result<_, _>>`{:.language-fsharp}
+A computional expression for `Async<Result<_, _>>`.
