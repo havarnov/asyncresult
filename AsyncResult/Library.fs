@@ -13,6 +13,11 @@ type AsyncResultBuilder() =
             return result
         }
 
+    member __.ReturnFrom(result: Result<_, _>) : Async<Result<_, _>> =
+        async {
+            return result
+        }
+
     member __.Bind(asyncResult: Async<Result<_, 'TError>>, binder: 'T -> Async<Result<'TOk, 'TError>>) =
         async {
             let! result = asyncResult
