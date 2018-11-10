@@ -49,6 +49,16 @@ let ``return from result directly with error`` () =
     Assert.Equal(Error 1, res)
 
 [<Fact>]
+let ``return from task`` () =
+    let res = asyncResult {
+        return! Task.FromResult(1)
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 1, res)
+
+[<Fact>]
 let ``bind async result`` () =
     let res = asyncResult {
         let! v = async { return Ok 1 }
