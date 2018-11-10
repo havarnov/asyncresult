@@ -59,6 +59,24 @@ let ``return from task`` () =
     Assert.Equal(Ok 1, res)
 
 [<Fact>]
+let ``match with unit`` () =
+    let res = asyncResult {
+        let mutable vv = 1
+        let! v = async { return Ok 1 }
+        match Some 1 with
+        | Some i ->
+            vv <- vv + i
+            i + i |> ignore
+        | None ->
+            1 |> ignore
+        return! async { return Ok vv }
+    }
+
+    let res = Async.RunSynchronously res
+
+    Assert.Equal(Ok 2, res)
+
+[<Fact>]
 let ``bind async result`` () =
     let res = asyncResult {
         let! v = async { return Ok 1 }

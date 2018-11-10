@@ -4,6 +4,14 @@ module AsyncResult
 open System.Threading.Tasks
 open System
 
+let bind binder asyncResult =
+    async {
+        let! result = asyncResult
+        match result with
+        | Ok v -> return! binder v
+        | Error err -> return Error err
+    }
+
 type AsyncResultBuilder() =
     member __.Return(value) = async { return Ok value }
 
@@ -24,13 +32,13 @@ type AsyncResultBuilder() =
             return Ok res
         }
 
-    member __.Bind(asyncResult: Async<Result<_, 'TError>>, binder: 'T -> Async<Result<'TOk, 'TError>>) =
-        async {
-            let! result = asyncResult
-            match result with
-            | Ok v -> return! binder v
-            | Error err -> return Error err
-        }
+    member __.Zero() = async { return Ok () }
+
+    member __.Combine(expr1, expr2) =
+        bind (fun () -> expr2) expr1
+
+    member __.Bind(asyncResult: Async<Result<'T, 'TError>>, binder: 'T -> Async<Result<'TOk, 'TError>>) =
+        bind binder asyncResult
 
     member __.Bind(task: Task, binder: unit -> Async<Result<'TOk, 'TError>>) =
         async {
